@@ -406,3 +406,51 @@ def Gn(n,wc,Zeff):
              - a**((2*n+1)/4)*sp.special.chebyt(2*n + 1)(u)*np.arctan(2*np.sqrt(wc)*a**(1/4)*u/(np.sqrt(a) - wc))
              - a**((2*n+1)/4)*v*sp.special.chebyu(2*n)(u)*np.arctanh(2*np.sqrt(wc)*a**(1/4)*v/(np.sqrt(a) + wc)))
     return out
+
+def calc_dreiserSeed(E0, E1, Z_eff, k, lnLambda, n_e, n_hat, u, epsabs=1e-9, epsrel=1e-6):
+    """
+    Numerically integrate F(E)/E over the energy interval [E0, E1].
+    
+    The integrand is defined as:
+    F(E)/E = C(Z) * Tilde_F(E) / E
+    
+    where:
+    C(Z) = sqrt(3(Z_eff + 5)) / (2^(3/2) * sqrt(pi)) * k * ln(Lambda) * n_e / n_hat * u^(-(27+3*Z_eff)/8)
+    
+    Tilde_F(E) = E^(-3(1+Z_eff)/16) * exp(-1/(4*u^2*E) - sqrt((1+Z_eff)/(u^2*E)))
+
+    :param float E0: Lower integration bound (energy).
+    :param float E1: Upper integration bound (energy).
+    :param float Z_eff: Effective charge.
+    :param float k: Coulomb logarithm coefficient.
+    :param float lnLambda: Coulomb logarithm ln(Lambda).
+    :param float n_e: Electron density.
+    :param float n_hat: Reference density.
+    :param float u: Dimensionless parameter.
+    :param float epsabs: Absolute tolerance for integration (default: 1e-9).
+    :param float epsrel: Relative tolerance for integration (default: 1e-6).
+    
+    :return: Integrated value of F(E)/E from E0 to E1.
+    :rtype: float
+    """
+    
+    # Pre-compute constant factor C(Z)
+    sqrt_pi = np.sqrt(np.pi)
+    C = (np.sqrt(3*(Z_eff + 5)) / (2**(3/2) * sqrt_pi) * 
+         k * lnLambda * n_e / n_hat * u**(-(27 + 3*Z_eff)/8))
+    
+    # Exponent for energy-dependent part
+    alpha = -3*(1 + Z_eff)/16
+    
+    def integrand(E):
+        """Compute F(E)/E for a given energy."""
+        exp_arg1 = -1 / (4 * u**2 * E)
+        exp_arg2 = -np.sqrt((1 + Z_eff) / (u**2 * E))
+        
+        tilde_F = E**alpha * np.exp(exp_arg1 + exp_arg2)
+        return C * tilde_F / E
+    
+    # Perform numerical integration using scipy.integrate.quad
+    result, error = sp.integrate.quad(integrand, E0, E1, epsabs=epsabs, epsrel=epsrel)
+    
+    return result
