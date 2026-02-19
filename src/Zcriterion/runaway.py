@@ -1,6 +1,11 @@
 import numpy as np
 import scipy as sp
 import Zcriterion.plasma as plasma
+import math as math
+from scipy import special
+import scipy.integrate as integrate
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 
 tau_T = 4500*24*60*60 # Tritium half-life [s]
 W_max = 18.6e3 # Maximum beta energy [eV]
@@ -375,6 +380,7 @@ def calc_analyticalTritiumSeedIntegral(E,Zeff):
 
     :param array_like E: Normalized electric field in units of Ec.
     :param array_like Zeff: Effective charge.
+
     """
     global W_max
     We = plasma.We # Electron rest energy in eV
@@ -407,50 +413,49 @@ def Gn(n,wc,Zeff):
              - a**((2*n+1)/4)*v*sp.special.chebyu(2*n)(u)*np.arctanh(2*np.sqrt(wc)*a**(1/4)*v/(np.sqrt(a) + wc)))
     return out
 
-def calc_dreiserSeed(E0, E1, Z_eff, k, lnLambda, n_e, n_hat, u, epsabs=1e-9, epsrel=1e-6):
+def calc_dreiserIntegral(E, Zeff, Te, analytical=False, root=False):
     """
-    Numerically integrate F(E)/E over the energy interval [E0, E1].
-    
-    The integrand is defined as:
-    F(E)/E = C(Z) * Tilde_F(E) / E
-    
-    where:
-    C(Z) = sqrt(3(Z_eff + 5)) / (2^(3/2) * sqrt(pi)) * k * ln(Lambda) * n_e / n_hat * u^(-(27+3*Z_eff)/8)
-    
-    Tilde_F(E) = E^(-3(1+Z_eff)/16) * exp(-1/(4*u^2*E) - sqrt((1+Z_eff)/(u^2*E)))
+    Evaluates the function F(E) used in the evaluation of the indefinate integral of F(E)/E
 
-    :param float E0: Lower integration bound (energy).
-    :param float E1: Upper integration bound (energy).
-    :param float Z_eff: Effective charge.
-    :param float k: Coulomb logarithm coefficient.
-    :param float lnLambda: Coulomb logarithm ln(Lambda).
-    :param float n_e: Electron density.
-    :param float n_hat: Reference density.
-    :param float u: Dimensionless parameter.
-    :param float epsabs: Absolute tolerance for integration (default: 1e-9).
-    :param float epsrel: Relative tolerance for integration (default: 1e-6).
-    
-    :return: Integrated value of F(E)/E from E0 to E1.
-    :rtype: float
+    :param array_like E: Normalized electric field in units of Ec.
+    :param array_like Zeff: Effective charge. 
+    :param bool analytical: Boolean that determines whether to evaluate the analytical expression for the dreiser seed (default: False).
+    :param bool root: Boolean that determines whether to evaluate the analytical expression including the root term of the analytical expression for the dreiser seed (default: False).
     """
-    
-    # Pre-compute constant factor C(Z)
-    sqrt_pi = np.sqrt(np.pi)
-    C = (np.sqrt(3*(Z_eff + 5)) / (2**(3/2) * sqrt_pi) * 
-         k * lnLambda * n_e / n_hat * u**(-(27 + 3*Z_eff)/8))
-    
-    # Exponent for energy-dependent part
-    alpha = -3*(1 + Z_eff)/16
-    
-    def integrand(E):
-        """Compute F(E)/E for a given energy."""
-        exp_arg1 = -1 / (4 * u**2 * E)
-        exp_arg2 = -np.sqrt((1 + Z_eff) / (u**2 * E))
+
+    # Constants
+    c = plasma.c # Speed of light
+    m_e = plasma.m_e # Electron mass
+    u = np.sqrt(Te/(m_e*c**2)) 
+    exp1 = -(1/(4*u**2*E))
+    exp2 = -np.sqrt((1+Zeff)/(u**2*E))
+    a = -3*(1+Zeff)/16
+    E_max = np.max(E)
+
+    def sum_analytical(n, u, E_max, a):
+        """Calculate the analytical sum term evaluated at E_max"""
+        total = 0
+        for i in range(1, n+1):
+            # Using gamma function for factorial of negative numbers
+            term = (4*u**2)**(i+1) * E_max**(a+i+1) * np.exp(-(1/(4*u**2*E_max))) 
+            term = term * special.gamma(a+i+1) * (-1)**i / special.gamma(a+1)
+            total += term
+        return total
+
+
+    if analytical:
+        # Analytical expression evaluated at the upper limit E_max
+        dreiser_analytical = 4*u**2 * E_max**(a + 1) * np.exp(-(1/(4*u**2*E_max))) + sum_analytical(20, u, E_max, a)
         
-        tilde_F = E**alpha * np.exp(exp_arg1 + exp_arg2)
-        return C * tilde_F / E
+        # For analytical, return a single value (the integral from E_0 to E_1)
+        return np.full_like(E, dreiser_analytical)
     
-    # Perform numerical integration using scipy.integrate.quad
-    result, error = sp.integrate.quad(integrand, E0, E1, epsabs=epsabs, epsrel=epsrel)
-    
-    return result
+    if analytical and root:
+        pass
+    else:
+        integrand = (E**a * np.exp(exp1 + exp2)) / E
+        dreiser_numerical = integrate.simpson(integrand, E)
+        return np.full_like(E, dreiser_numerical)
+
+
+
