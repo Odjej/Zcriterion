@@ -176,3 +176,4 @@ print("Max difference (gamma vs series):", np.nanmax(np.abs(difference_ana)))
 print("Max difference (series vs numerical):", np.nanmax(np.abs(difference_ser_num)))
 print("Max difference (gamma vs numerical):", np.nanmax(np.abs(difference_gam_num)))
 
+# yo
