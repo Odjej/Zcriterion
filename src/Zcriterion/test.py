@@ -116,7 +116,7 @@ Zeff = 1.51
 Te = 5 * 1.602e-19   
 n_terms = 40
 E_min = 1.0  # Lower integration limit 
-E_points = np.linspace(1, 1000, 10000)  # Energy points from 1 to 1000
+E_points = np.linspace(1, 1000, 100000)  # Energy points from 1 to 1000
 
 num = dreicer_numerical(E_points, E_min, Zeff, Te)
 ana_series = dreicer_analytical(E_points, E_min, Zeff, Te, n_terms, gamma_func=False)
@@ -146,6 +146,7 @@ ax2 = axes[0, 1]
 ax2.plot(E_points, difference_ana, 'r-', linewidth=2)
 ax2.set_xlabel("E")
 ax2.set_ylabel("Relative difference")
+ax2.set_ylim(0.9, 1.1)
 ax2.set_title(f"Series / Gamma \nMax diff: {np.nanmax(np.abs(difference_ana)):.2e}")
 ax2.grid(True, alpha=0.3)
 ax2.set_yscale('log')
@@ -155,6 +156,7 @@ ax3 = axes[1, 0]
 ax3.plot(E_points, difference_ser_num, 'b-', linewidth=2)
 ax3.set_xlabel("E")
 ax3.set_ylabel("Relative difference")
+ax3.set_ylim(0.7, 1.1)
 ax3.set_title(f"Numerical / Series \nMax diff: {np.nanmax(np.abs(difference_ser_num)):.2e}")
 ax3.grid(True, alpha=0.3)
 ax3.set_yscale('log')
@@ -164,6 +166,7 @@ ax4 = axes[1, 1]
 ax4.plot(E_points, difference_gam_num, 'g-', linewidth=2)
 ax4.set_xlabel("E")
 ax4.set_ylabel("Relative difference")
+ax4.set_ylim(0.7, 1.1)
 ax4.set_title(f"Numerical / Gamma \nMax diff: {np.nanmax(np.abs(difference_gam_num)):.2e}")
 ax4.grid(True, alpha=0.3)
 ax4.set_yscale('log')
