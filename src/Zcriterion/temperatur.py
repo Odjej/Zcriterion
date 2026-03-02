@@ -1,7 +1,9 @@
 import numpy as np
 import scipy as sp
 import Zcriterion.ADAS.rates as rates
+
 import Zcriterion.atomicPhysics as atomic
+import Zcriterion.GeriMap as gerimap
 
 #ARC-parametrar
 a  = 1.18  # minor radius (m)
@@ -9,14 +11,14 @@ Ip = 12e6   # Target plasma current (A)
 j0 = np.array([Ip / (np.pi * a**2)])  # current density (A/m^2) 
 
 #simuleringsparametrar
-n_Ne = np.geomspace(1e18, 1e23, 100)
-n_D = np.geomspace(1e20, 1e25, 100)
+n_Ne = np.geomspace(1e16, 1e21, 30)
+n_D = np.geomspace(1e20, 5e22, 30)
 n_D0 = 1.5e20 * np.ones(len(n_D))
 n_T0 = 1.5e20 * np.ones(len(n_D))
 n = [n_D0, n_T0, n_D, n_Ne]
 T_e = 5.0 * np.ones(len(n_D))
 Z_eff = np.linspace(1, 3 ,2)
-#print(n)
+
 rates_scd = []
 rates_acd = []
 rates_plt = []
@@ -40,52 +42,39 @@ tempmatris = []
 
 for i in range(len(n_D)):
     row = []
-    n_Ne_konstant = n_Ne[i] * np.ones(len(n_Ne))
+    n_Ne_konstant = n_Ne[i] * np.ones(len(n_D))
     n = [n_D0, n_T0, n_D, n_Ne_konstant]
     temp = atomic.equilibriumTemperature(n, j0, T_e,  rates_scd, rates_acd, rates_plt, rates_prb)
     row.append(temp)
     tempmatris.append(row)
 
 #print(tempmatris)
+#print('Neon:', n_Ne)
+#print('Deuterium', n_D)
 
+#försöker lösa det som matris direkt
 
-heatmap_matrix = np.array([row[0] for row in tempmatris])
-
-
+heatmap_matrix = np.array([row[0] for row in tempmatris]) #föratt göra matrisen plot-bar
+#print(heatmap_matrix)
 import matplotlib.pyplot as plt
 
-plt.imshow(
-    heatmap_matrix,
-    aspect='auto',
-    origin='lower',
-    extent=[n_D[0], n_D[-1], n_Ne[0], n_Ne[-1]],
-cmap="hot", vmin=0, vmax=30)
+gerimap.register #för att få rätt colormap som i deras artikel
+GeriMap = gerimap.get() 
+
+fig, ax = plt.subplots()
+levels = np.linspace(0, 30, 300)
+
+cp = plt.contourf(n_D, n_Ne, heatmap_matrix, levels=levels, cmap = GeriMap, extend="max")
+cbar = plt.colorbar(cp,label="Temperatur (eV)")
+important_levels = np.linspace(0, 30, 7)
+cbar.set_ticks(important_levels)
+iso_levels = [10, 100, 1000, 1500]
+cs = ax.contour(n_D, n_Ne, heatmap_matrix, levels=iso_levels, colors='gray', linewidths=1, data=iso_levels)
 
 
+plt.ylabel(r'$n_\mathrm{Ne}(\mathrm{m}^{-3})$')
+plt.xlabel(r'$n_\mathrm{D}(\mathrm{m}^{-3})$')
 plt.xscale("log")
 plt.yscale("log")
-
-plt.xlabel("n_D [/m^3]")
-plt.ylabel("n_Ne [/m^3]")
-plt.colorbar(label="T_e [ev]")
-
+plt.tight_layout()
 plt.show()
-
-
-
-
-#for i in range(len(n_Ne)):
- #   row = []
-  #  for j in range(len(n_D)):
-   #   n_loop = [np.array([n[0][0]]), np.array([n[1][0]]), np.array([n[2][j]]), np.array([n[3][i]])]
-     # [arr[0], arr[1][1], arr[2][1]]
-    #  temp = atomic.equilibriumTemperature(n_loop, j0, T_e,  rates_scd, rates_acd, rates_plt, rates_prb)
-       #def equilibriumTemperature(n_Z,j0,T_guess,ionRate,recombRate,lineRadRate,bremsRate = None,solveInLogScale = True,solver = 'brentq')
-      #row.append(temp)
-    ##tempmatris.append(row)
-#print(tempmatris)
-#for i in range(len(a)):
- #   row = []  # ny rad i matrisen
-  #  for j in range(len(b)):
-   ##    row.append(value)  # lägg till i raden
-   # result.append(row)  # lägg till raden i matrisen
