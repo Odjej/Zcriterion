@@ -125,6 +125,29 @@ plt.xlabel(r'$n_\mathrm{D}(\mathrm{m}^{-3})$')
 plt.xscale("log")
 plt.yscale("log")
 plt.tight_layout()
-plt.show()
+#plt.show()
 
+#np.savez(r'C:\Users\loeir\Kod ARC\heatmap_matrix.npz', Temp = heatmap_matrix, n_D = n_D, n_Ne = n_Ne)
+#np.savez(r'C:\Users\loeir\Kod ARC\Z_eff.npz', Z_eff = Z_eff, z = z, n_D = n_D, n_Ne = n_Ne)
+#['Temp','D', 'D_jon', 'T', 'T_jon', 'Ne', 'Ne_jon1', 'Ne_jon2','Ne_jon3', 'Ne_jon4', 'Ne_jon5', 'Ne_jon6', 'Ne_jon7', 'Ne_jon8',
+#'Ne_jon9', 'Ne_jon10']
+#np.savez(r'C:\Users\loeir\Kod ARC\Temp och Z.npz')
+#print(densitymatris)
+#for i in len(z):
+#    i = np.column_stack([A[:,i] for A in densitymatris])
+#print(z)
+def d(typ):
+    C = np.column_stack([A[:,typ] for A in densitymatris])
+    return C
+
+#print(d(z[0]))
+#['Temp','D', 'D_jon', 'T', 'T_jon', 'Ne', 'Ne_jon1', 'Ne_jon2','Ne_jon3', 'Ne_jon4', 'Ne_jon5', 'Ne_jon6', 'Ne_jon7', 'Ne_jon8',
+#'Ne_jon9', 'Ne_jon10']
+np.savez(r'C:\Users\loeir\Kod ARC\Temp och Z.npz', Temp = heatmap_matrix, D = (d(z[0]) + d(z[4])) , D_jon = (d(z[1]) + d(z[5])), T = d(z[2]), T_jon = d(z[3]), 
+         Ne = d(z[6]), Ne_jon1 = d(z[7]), Ne_jon2 = d(z[8]), Ne_jon3 = d(z[9]), Ne_jon4 = d(z[10]), Ne_jon5 = d(z[11]), Ne_jon6 = d(z[12]), 
+         Ne_jon7 = d(z[13]), Ne_jon8 = d(z[14]), Ne_jon9 = d(z[15]), Ne_jon10=d(z[16]), n_D = n_D, n_Ne = n_Ne, z = z)
+print(d(z[1]), d(z[16]))
+Neon = np.array([d(z[6]),d(z[7]),d(z[8]),d(z[9])])
+print(Neon)
+print(Neon[:, 2, 0])
 
