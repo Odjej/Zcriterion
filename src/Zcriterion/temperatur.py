@@ -1,5 +1,8 @@
 import numpy as np
 import scipy as sp
+#import pandas as pd
+import sys
+sys.path.append('/home/loe/Desktop/Zcriterion/src')
 import Zcriterion.ADAS.rates as rates
 
 import Zcriterion.atomicPhysics as atomic
@@ -11,8 +14,8 @@ Ip = 12e6   # Target plasma current (A)
 j0 = np.array([Ip / (np.pi * a**2)])  # current density (A/m^2) 
 
 #simuleringsparametrar
-n_Ne = np.geomspace(1e16, 1e21, 3)
-n_D = np.geomspace(1e20, 5e22, 3)
+n_Ne = np.geomspace(1e16, 1e21, 100)
+n_D = np.geomspace(1e20, 5e22, 100)
 n_D0 = 1.5e20 * np.ones(len(n_D))
 n_T0 = 1.5e20 * np.ones(len(n_D))
 n = [n_D0, n_T0, n_D, n_Ne]
@@ -38,8 +41,7 @@ for i in species:
 
 tempmatris = []
 print(rates_scd)
-#ADAS.rates.get_rate(species, rateName), där ’species’ är t.ex. ’D’, ’T’, ’Ne’. etc, 
-#och rateName är ’scd’, ’acd’, ’plt’ eller ’prb’, vilket står för jonisering, rekombinering, linjestrålning och bromsstrålning
+
 for i in range(len(n_D)):
     row = []
     n_Ne_konstant = n_Ne[i] * np.ones(len(n_D))
@@ -48,16 +50,8 @@ for i in range(len(n_D)):
     row.append(temp)
     tempmatris.append(row)
 
-
-
-#print(tempmatris)
-#print('Neon:', n_Ne)
-#print('Deuterium', n_D)
-
-#försöker lösa det som matris direkt
-
 heatmap_matrix = np.array([row[0] for row in tempmatris]) #föratt göra matrisen plot-bar
-#print(heatmap_matrix)
+print(heatmap_matrix.T)
 import matplotlib.pyplot as plt
 
 gerimap.register #för att få rätt colormap som i deras artikel
@@ -70,7 +64,7 @@ cp = plt.contourf(n_D, n_Ne, heatmap_matrix, levels=levels, cmap = GeriMap, exte
 cbar = plt.colorbar(cp,label="Temperatur (eV)")
 important_levels = np.linspace(0, 30, 7)
 cbar.set_ticks(important_levels)
-iso_levels = [10, 100, 1000, 1500]
+iso_levels = [10, 100, 200, 1000]
 cs = ax.contour(n_D, n_Ne, heatmap_matrix, levels=iso_levels, colors='gray', linewidths=1, data=iso_levels)
 #ax.clabel(cs, iso_levels)
 
@@ -87,36 +81,27 @@ for i in range(len(n_D)):
     density_row = []
     Z_row = []
     n_Ne_konstant = n_Ne[i] * np.ones(len(n_D))
+    T = heatmap_matrix[i,:]
     n = [n_D0, n_T0, n_D, n_Ne_konstant]
-    n_j, Z = atomic.coronalEquilibrium(n, T_e,  rates_scd, rates_acd)
+    n_j, Z = atomic.coronalEquilibrium(n, T,  rates_scd, rates_acd)
     #density_row.append(n_j)
     #Z_row.append(Z)
     densitymatris.append(n_j)
     Z_matris.append(Z)
-#print(densitymatris)
-#density_matrix = np.array([row[0] for row in densitymatris]) #föratt göra matrisen plot-bar
-#Z_matrix = np.array([row[0] for row in Z_matris]) #föratt göra matrisen plot-bar
 
-#print(density_matrix)
-#d = densitymatris[0]
-#print(d.shape)
-#print(d)
 z = Z_matris[0]
-#print(d)
-#print(z)
-#dot =d@(z**2)/(d @ z)
+print("shape", heatmap_matrix.shape, len(n_Ne))
+
 Z_eff = densitymatris @ (z ** 2) / (densitymatris @ z)
-#print(dot)
-#print(Z_eff)
 
 fig, ax = plt.subplots()
 levels = np.linspace(1, 3, 300)
 
 c1 = plt.contourf(n_D, n_Ne, Z_eff, levels=levels, cmap = GeriMap, extend="max")
-cbar = plt.colorbar(c1,label="Z (eV)")
+cbar = plt.colorbar(c1,label=r'$Z_\mathrm{eff}$')
 important_levels = np.linspace(0, 3, 7)
 cbar.set_ticks(important_levels)
-Z_levels = [1.01, 1.1, 1.4, 1.8]
+Z_levels = [1.01, 1.1, 1.5]
 c2 = ax.contour(n_D, n_Ne, Z_eff, levels=Z_levels, colors='gray', linewidths=1, data=Z_levels)
 
 
@@ -124,30 +109,42 @@ plt.ylabel(r'$n_\mathrm{Ne}(\mathrm{m}^{-3})$')
 plt.xlabel(r'$n_\mathrm{D}(\mathrm{m}^{-3})$')
 plt.xscale("log")
 plt.yscale("log")
+plt.rcParams.update({
+        "font.family": "DejaVu Serif",  # lik Computer Modern
+        "axes.titlesize": 18,
+        "axes.labelsize": 18,
+        "xtick.labelsize": 18,
+        "ytick.labelsize": 18,
+        "legend.fontsize": 18,
+        "mathtext.fontset": "dejavuserif",  # matchar math text
+    })
 plt.tight_layout()
 #plt.show()
 
-#np.savez(r'C:\Users\loeir\Kod ARC\heatmap_matrix.npz', Temp = heatmap_matrix, n_D = n_D, n_Ne = n_Ne)
-#np.savez(r'C:\Users\loeir\Kod ARC\Z_eff.npz', Z_eff = Z_eff, z = z, n_D = n_D, n_Ne = n_Ne)
-#['Temp','D', 'D_jon', 'T', 'T_jon', 'Ne', 'Ne_jon1', 'Ne_jon2','Ne_jon3', 'Ne_jon4', 'Ne_jon5', 'Ne_jon6', 'Ne_jon7', 'Ne_jon8',
-#'Ne_jon9', 'Ne_jon10']
-#np.savez(r'C:\Users\loeir\Kod ARC\Temp och Z.npz')
-#print(densitymatris)
-#for i in len(z):
-#    i = np.column_stack([A[:,i] for A in densitymatris])
-#print(z)
-def d(typ):
-    C = np.column_stack([A[:,typ] for A in densitymatris])
-    return C
+densitymatris = np.array(densitymatris)
+# Namn på laddningstillstånden
+names = ['D0', 'D0_jon', 'T', 'T_jon', 'D', 'D_jon', 'Ne', 'Ne_jon1', 'Ne_jon2','Ne_jon3', 'Ne_jon4', 'Ne_jon5', 'Ne_jon6', 'Ne_jon7', 'Ne_jon8',
+'Ne_jon9', 'Ne_jon10']
+k = 0 #neonaxeln
+j = 0 #deuteriumaxeln
+# Skapa dictionary med 3x3-lager för varje laddningstillstånd
+densities = {name: densitymatris[:, :, i] for i, name in enumerate(names)}
+globals().update(densities)
+#print(D0_0, D_0)
+n_D_joner = np.array([D0 + D0_jon, D + D_jon])
+n_T_joner = np.array([T, T_jon])
+n_Ne_joner= np.array([Ne, Ne_jon1, Ne_jon2, Ne_jon3, Ne_jon4, Ne_jon5, Ne_jon6, Ne_jon7, Ne_jon8, Ne_jon9, Ne_jon10])
 
-#print(d(z[0]))
-#['Temp','D', 'D_jon', 'T', 'T_jon', 'Ne', 'Ne_jon1', 'Ne_jon2','Ne_jon3', 'Ne_jon4', 'Ne_jon5', 'Ne_jon6', 'Ne_jon7', 'Ne_jon8',
-#'Ne_jon9', 'Ne_jon10']
-np.savez(r'C:\Users\loeir\Kod ARC\Temp och Z.npz', Temp = heatmap_matrix, D = (d(z[0]) + d(z[4])) , D_jon = (d(z[1]) + d(z[5])), T = d(z[2]), T_jon = d(z[3]), 
-         Ne = d(z[6]), Ne_jon1 = d(z[7]), Ne_jon2 = d(z[8]), Ne_jon3 = d(z[9]), Ne_jon4 = d(z[10]), Ne_jon5 = d(z[11]), Ne_jon6 = d(z[12]), 
-         Ne_jon7 = d(z[13]), Ne_jon8 = d(z[14]), Ne_jon9 = d(z[15]), Ne_jon10=d(z[16]), n_D = n_D, n_Ne = n_Ne, z = z)
-print(d(z[1]), d(z[16]))
-Neon = np.array([d(z[6]),d(z[7]),d(z[8]),d(z[9])])
-print(Neon)
-print(Neon[:, 2, 0])
+total_D = np.sum(n_D_joner[:, k, j]) #vänster neon, höger deuterium
+total_T = np.sum(n_T_joner[:, k, j])
+total_Ne = np.sum(n_Ne_joner[:, k, j])
 
+
+np.savez(r'/home/loe/Desktop/DREAM/examples/ARC/Temp och Z/Temp och Z_100.npz', Temp = heatmap_matrix, D0 = D0, 
+         D0_jon = D0_jon, 
+         T = T, T_jon = T_jon, D = D, D_jon = D_jon, Ne = Ne, Ne_jon1 = Ne_jon1, Ne_jon2 = Ne_jon2,
+         Ne_jon3 = Ne_jon3, Ne_jon4 = Ne_jon4, Ne_jon5 = Ne_jon5, Ne_jon6 = Ne_jon6, Ne_jon7 = Ne_jon7, 
+         Ne_jon8 = Ne_jon8, Ne_jon9 = Ne_jon9, Ne_jon10 = Ne_jon10, n_D = n_D, n_Ne = n_Ne, z = z)
+np.savez(r'/home/loe/Desktop/DREAM/examples/ARC/Data/Z_eff100.npz', Z_eff = Z_eff)
+
+print("Klar")
