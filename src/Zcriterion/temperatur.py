@@ -14,8 +14,8 @@ Ip = 12e6   # Target plasma current (A)
 j0 = np.array([Ip / (np.pi * a**2)])  # current density (A/m^2) 
 
 #simuleringsparametrar
-n_Ne = np.geomspace(1e16, 1e21, 100)
-n_D = np.geomspace(1e20, 5e22, 100)
+n_Ne =np.geomspace(1e16, 1e21, 3)
+n_D = np.geomspace(1e20, 5e22, 3)
 n_D0 = 1.5e20 * np.ones(len(n_D))
 n_T0 = 1.5e20 * np.ones(len(n_D))
 n = [n_D0, n_T0, n_D, n_Ne]
@@ -51,7 +51,7 @@ for i in range(len(n_D)):
     tempmatris.append(row)
 
 heatmap_matrix = np.array([row[0] for row in tempmatris]) #föratt göra matrisen plot-bar
-print(heatmap_matrix.T)
+print(heatmap_matrix)
 import matplotlib.pyplot as plt
 
 gerimap.register #för att få rätt colormap som i deras artikel
@@ -88,7 +88,8 @@ for i in range(len(n_D)):
     #Z_row.append(Z)
     densitymatris.append(n_j)
     Z_matris.append(Z)
-
+#densitymatris=np.array(densitymatris).T
+#Z_matris=np.array(Z_matris).T
 z = Z_matris[0]
 print("shape", heatmap_matrix.shape, len(n_Ne))
 
@@ -125,6 +126,8 @@ densitymatris = np.array(densitymatris)
 # Namn på laddningstillstånden
 names = ['D0', 'D0_jon', 'T', 'T_jon', 'D', 'D_jon', 'Ne', 'Ne_jon1', 'Ne_jon2','Ne_jon3', 'Ne_jon4', 'Ne_jon5', 'Ne_jon6', 'Ne_jon7', 'Ne_jon8',
 'Ne_jon9', 'Ne_jon10']
+
+
 k = 0 #neonaxeln
 j = 0 #deuteriumaxeln
 # Skapa dictionary med 3x3-lager för varje laddningstillstånd
@@ -140,11 +143,12 @@ total_T = np.sum(n_T_joner[:, k, j])
 total_Ne = np.sum(n_Ne_joner[:, k, j])
 
 
-np.savez(r'/home/loe/Desktop/DREAM/examples/ARC/Temp och Z/Temp och Z_100.npz', Temp = heatmap_matrix, D0 = D0, 
+np.savez(r'/home/loe/Desktop/DREAM/examples/ARC/Temp och Z/Temp och Z_3.npz', Temp = heatmap_matrix, D0 = D0, 
          D0_jon = D0_jon, 
          T = T, T_jon = T_jon, D = D, D_jon = D_jon, Ne = Ne, Ne_jon1 = Ne_jon1, Ne_jon2 = Ne_jon2,
-         Ne_jon3 = Ne_jon3, Ne_jon4 = Ne_jon4, Ne_jon5 = Ne_jon5, Ne_jon6 = Ne_jon6, Ne_jon7 = Ne_jon7, 
+   
+      Ne_jon3 = Ne_jon3, Ne_jon4 = Ne_jon4, Ne_jon5 = Ne_jon5, Ne_jon6 = Ne_jon6, Ne_jon7 = Ne_jon7, 
          Ne_jon8 = Ne_jon8, Ne_jon9 = Ne_jon9, Ne_jon10 = Ne_jon10, n_D = n_D, n_Ne = n_Ne, z = z)
-np.savez(r'/home/loe/Desktop/DREAM/examples/ARC/Data/Z_eff100.npz', Z_eff = Z_eff)
+np.savez(r'/home/loe/Desktop/DREAM/examples/ARC/Data/Z_eff3.npz', Z_eff = Z_eff)
 
 print("Klar")
