@@ -56,19 +56,23 @@ def calc_Gamma(Z,Z0,n_j,T_e,E,B = 0, reltol = 1e-3, maxIter = 10, analytical = F
            
     return Gamma
 
+
 # Exponent in avalanche multiplication, derived in Hesslow et al. NF (2019)
 
-def calc_N_ava(Z,Z0,n_j,T_e,j0,a_wall,B = 0,reltol = 1e-3,maxIter = 10, analytical = False):
+def calc_N_ava(Z,Z0,n_j,T_e,j0,R,a_wall,L,B = 0,neglectBremsstrahlung = False,reltol = 1e-3,maxIter = 10, analytical = False):
     """
     Compute exponent for avalanche multiplication factor.
 
     :param array_like Z: 1D array of charge numbers.
     :param array_like Z0: 1D array of charge states.
     :param array_like n_j: Charge state distribution. Last axis must match the size of Z and Z0.
-    :param array_like T_e: Electron temperature.
-    :param array_like j0: Initial current density.
+    :param array_like T_e: Electron temperature [eV].
+    :param array_like j0: Initial current density [A/m^2].
+    :param array_like R: Major radius f the plasma [m]
     :param array_like a_wall: Minor radius of wall [m]
+    :param array_like L: Self-inductance of the plasma [H] (default: mu0*R)
     :param array_like B: Magnetic field used to compute synchrotron radiation [T] (default: 0).
+    :param bool neglectBremsstrahlung: Neglect bremsstrahlung contribution to Eceff (default: False)
     :param float reltol: Relative tolerence when iterating (default: 1e-3).
     :param int maxIter: Maximum number of iterations when evaluating pStar (default: 10).
     :param bool analytical: Evaluate using analytical formulation, which includes first order corrections for partial screening (default: False).
@@ -87,22 +91,20 @@ def calc_N_ava(Z,Z0,n_j,T_e,j0,a_wall,B = 0,reltol = 1e-3,maxIter = 10, analytic
     Ec = plasma.calc_Ec(T_e,n_e_free)
     # Effective critical electric field in units of Ec
     if analytical:
-        Eceff = 1
         lnL = plasma.lnLc(T_e,n_e_free) 
         Z_eff_RP = plasma.calc_Zeff(Z0,Z,n_j,includeBoundElectrons = True)
         n_e_bound = n_e_tot - n_e_free
         E_C_RP = (1 + n_e_bound/(2*n_e_free))
-        inteGammaOverE = (Ec*e/(m_e*c*lnL)*n_e_tot/n_e_free*(np.maximum(E_init/E_C_RP,1) - np.log(np.maximum(E_init/E_C_RP,1)))/np.sqrt(5 + Z_eff_RP) 
-                         - Ec*e/(m_e*c*lnL)*n_e_tot/n_e_free/np.sqrt(5 + Z_eff_RP))
+        intGammaOverE = Ec*e/(m_e*c*lnL)*n_e_tot/n_e_free*(np.maximum(E_init/E_C_RP,1) - np.log(np.maximum(E_init/E_C_RP,1)) - 1)/np.sqrt(5 + Z_eff_RP) 
     else:
-        Eceff = np.minimum(plasma.calc_Eceff(Z,Z0,n_j,T_e,B,reltol = reltol, maxIter = maxIter)*n_e_tot/n_e_free,E_init)
+        Eceff = np.minimum(plasma.calc_Eceff(Z,Z0,n_j,T_e,B = B,neglectBremsstrahlung = neglectBremsstrahlung,reltol = reltol, maxIter = maxIter)*n_e_tot/n_e_free,E_init)
         E = np.linspace(Eceff,E_init,1000)
         Gamma = calc_Gamma(Z,Z0,n_j,T_e,E,B,reltol = reltol, maxIter = maxIter)
-        inteGammaOverE = sp.integrate.simpson(Gamma/E,E,axis = 0)
+        intGammaOverE = sp.integrate.simpson(Gamma/E,E,axis = 0)
         
-    tau_CQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,a_wall) 
+    tau_CQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a_wall,L) 
 
-    return tau_CQ*inteGammaOverE
+    return tau_CQ*intGammaOverE
 
 # Critical runaway momentum consistent with the definition of Gamma
 
@@ -257,7 +259,7 @@ def calc_sigmaEff_alt(Wc,C):
 
 # Evaluate Compton scattering seed current in units of j0/ec
 
-def calc_comptonSeed(Z,Z0,n_j,T_e,j0,a,Gamma_flux,C = np.array([1.2, 0.8, 0]),
+def calc_comptonSeed(Z,Z0,n_j,T_e,j0,R,a,L,Gamma_flux,C = np.array([1.2, 0.8, 0]),
                      B = 0,maxIter = 10,reltol = 1e-3, analytical = False):
     """
     Compute integrated Compton scattering seed in units of j0/ec.
@@ -267,7 +269,9 @@ def calc_comptonSeed(Z,Z0,n_j,T_e,j0,a,Gamma_flux,C = np.array([1.2, 0.8, 0]),
     :param array_like n_j: Densities (in m^-3) for each species and charge state, last dimension should match the total number of charge states and species.
     :param array_like T_e: Electron temperature [eV]
     :param array_like j0: Initial Ohmic current density [A/m^2]
+    :param array_like R: Major radius of plasma [m]
     :param array_like a: Minor radius of plasma [m]
+    :param array_like L: Self-inductance of plasma [H]
     :param array_like Gamma_flux: Total flux of gamma-photons [m^-2 s^-1]
     :param list C: Fitting parameters for Compton spectrum
     :param array_like B: Magnetic field used for syncrotron radiation when evaluating Eceff (default: 0)
@@ -287,7 +291,7 @@ def calc_comptonSeed(Z,Z0,n_j,T_e,j0,a,Gamma_flux,C = np.array([1.2, 0.8, 0]),
     Z_eff = np.sum(Z0**2*n_j,axis = -1)/n_e_free # Effective charge
     n_e_tot = np.sum(Z*n_j,axis = -1) # Total electron density
     sigma = plasma.calc_spitzerCond(T_e,n_e_free,Z_eff)
-    tau_CQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,a)
+    tau_CQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L)
 
     E_init = j0/(sigma*plasma.calc_Ec(T_e,n_e_free)) # Initial electric field in units of Ec
     # Effective critical electric field in units of Ec
@@ -313,7 +317,7 @@ def calc_comptonSeed(Z,Z0,n_j,T_e,j0,a,Gamma_flux,C = np.array([1.2, 0.8, 0]),
 
 # Evaluate Tritium beta decay seed current in units of j0/ec
 
-def calc_tritiumSeed(Z,Z0,n_j,T_e,n_T,j0,a,B = 0,maxIter = 10,reltol = 1e-3,analytical = False):
+def calc_tritiumSeed(Z,Z0,n_j,T_e,n_T,j0,R,a,L,B = 0,maxIter = 10,reltol = 1e-3,analytical = False):
     """
     Compute integrated Tritium beta decay seed in units of j0/ec.
 
@@ -323,9 +327,9 @@ def calc_tritiumSeed(Z,Z0,n_j,T_e,n_T,j0,a,B = 0,maxIter = 10,reltol = 1e-3,anal
     :param array_like T_e: Electron temperature [eV]
     :param array_like n_T: Total tritium density [m^-3]
     :param array_like j0: Initial Ohmic current density [A/m^2]
+    :param array_like R: Major radius of plasma [m]
     :param array_like a: Minor radius of plasma [m]
-    :param array_like Gamma_flux: Total flux of gamma-photons [m^-2 s^-1]
-    :param list C: Fitting parameters for Compton spectrum
+    :param array_like L: Self-inductance of plasma [H]
     :param array_like B: Magnetic field used for syncrotron radiation when evaluating Eceff (default: 0)
     :param int maxIter: Maximum number of iterations when evaluating p_star and Eceff (default: 10)
     :param float reltol: Relative tolerence when evaluating p_star and Eceff (default: 1e-3)
@@ -342,7 +346,7 @@ def calc_tritiumSeed(Z,Z0,n_j,T_e,n_T,j0,a,B = 0,maxIter = 10,reltol = 1e-3,anal
     Z_eff = np.sum(Z0**2*n_j,axis = -1)/n_e_free # Effective charge
     n_e_tot = np.sum(Z*n_j,axis = -1) # TOtal electron density
     sigma = plasma.calc_spitzerCond(T_e,n_e_free,Z_eff)
-    tau_CQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,a)
+    tau_CQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L)
     E_init = j0/(sigma*plasma.calc_Ec(T_e,n_e_free)) # Initial electric field in units of Ec
 
     if analytical:

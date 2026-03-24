@@ -181,23 +181,38 @@ def calc_tau_c(T_e,n_e):
     tau_c = constFactor/(n_e*lnL)
     return tau_c
 
+# Self-inductance of the plasma
+
+def calc_selfInductance(R,a,l_i = 0):
+    """
+    Compute self-inductance of the plasma in units of mu0*R
+    
+    :param array_like R: Major radius of the plasma in m.
+    :param array_like a: Minor radius of the plasma in m.
+    :param array_like l_i: Parameter that accounts for the current distribution. Default is 0.
+    """
+
+    L = (np.log(8*R/a) - 2 + l_i/2 )
+    return L
 # Current quench time, accounts for radial diffusion of electric fields.
 # See Hesslow et al. NF (2019)
 
-def calc_tau_CQ(T_e,n_e,Z_eff,a_wall):
+def calc_tau_CQ(T_e,n_e,Z_eff,R,a_wall,L):
     """
     Compute current quench time.
 
     :param array_like T_e: Electron temperature in eV.
     :param array_like n_e: Electron density in m^-3.
     :param array_like Z_eff: Effective charge.
-    :param array_like a_wall: Minor radius of the wall.
+    :param array_like R: Major radius of the plasma in m. 
+    :param array_like a_wall: Minor radius of the wall in m.
+    :param array_like L: Plasma self-inductance in H.
     """
     # Constants
     global mu0, x1
 
     sigma = calc_spitzerCond(T_e,n_e,Z_eff)
-    tau_CQ = sigma*mu0*a_wall**2/x1**2
+    tau_CQ = L/(mu0*R)*sigma*mu0*a_wall**2/x1**2
     return tau_CQ
 
 # Critical electric field
@@ -344,7 +359,7 @@ def calc_pStar(Z,Z0,n_j,T_e,E,pGuess = None,reltol = 1e-3,maxIter = 10):
 # obtained by iteration between equations (23) and (24) until convergence. Note that the large momentum approximation may break down 
 # at high densities
 
-def calc_Eceff(Z,Z0,n_j,T_e,B,reltol = 1e-3,maxIter = 10):
+def calc_Eceff(Z,Z0,n_j,T_e,B,neglectBremsstrahlung = False,reltol = 1e-3,maxIter = 10):
     """
     Compute effective electric field. Ec_eff is evaluated iteratively.
 
@@ -353,6 +368,7 @@ def calc_Eceff(Z,Z0,n_j,T_e,B,reltol = 1e-3,maxIter = 10):
     :param array_like n_j: Charge state distribution. Last axis must match the size of Z and Z0.
     :param array_like T_e: Electron temperature.
     :param array_like B: Magnetic field used to compute synchrotron radiation [T].
+    :param bool neglectBremsstrahlung: Neglect bremsstrahlung contribution to Eceff (default: False).
     :param float reltol: Relative tolerence when iterating (default: 1e-3).
     :param int maxIter: Maximum number of iterations when evaluating pStar (default: 10).
     """
@@ -392,8 +408,12 @@ def calc_Eceff(Z,Z0,n_j,T_e,B,reltol = 1e-3,maxIter = 10):
     tauRadInv = B**2/(n_e_free/1e20)/(15.44*lnL)
 
     # Coefficients for bremsstrahlung (see eqn (18) and (24) in Hesslow et al. PPFC (2018))
-    phi_b1 = alpha*Z_tot_eff/lnL*0.35
-    phi_b2 = alpha*Z_tot_eff/lnL*0.20
+    if neglectBremsstrahlung:
+        phi_b1 = 0
+        phi_b2 = 0
+    else:
+        phi_b1 = alpha*Z_tot_eff/lnL*0.35
+        phi_b2 = alpha*Z_tot_eff/lnL*0.20
 
     p_c0 = nu_D0/(2*nu_S1)
 
