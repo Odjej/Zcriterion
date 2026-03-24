@@ -1,0 +1,2 @@
+ERROR: ld.so: object '/usr/lib/x86_64-linux-gnu/libgtk3-nocsd.so.0' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
+python3: can't open file '/*programname': [Errno 2] No such file or directory
