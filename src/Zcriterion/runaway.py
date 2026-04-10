@@ -417,49 +417,103 @@ def Gn(n,wc,Zeff):
              - a**((2*n+1)/4)*v*sp.special.chebyu(2*n)(u)*np.arctanh(2*np.sqrt(wc)*a**(1/4)*v/(np.sqrt(a) + wc)))
     return out
 
-def calc_dreiserIntegral(E, Zeff, Te, analytical=False, root=False):
+
+def calc_dreicerSeed(Z,Z0,Zeff,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3, n_terms = 20, analytical = False, gamma_func = False):
     """
-    Evaluates the function F(E) used in the evaluation of the indefinate integral of F(E)/E
-
-    :param array_like E: Normalized electric field in units of Ec.
-    :param array_like Zeff: Effective charge. 
-    :param bool analytical: Boolean that determines whether to evaluate the analytical expression for the dreiser seed (default: False).
-    :param bool root: Boolean that determines whether to evaluate the analytical expression including the root term of the analytical expression for the dreiser seed (default: False).
-    """
-
-    # Constants
-    c = plasma.c # Speed of light
-    m_e = plasma.m_e # Electron mass
-    u = np.sqrt(Te/(m_e*c**2)) 
-    exp1 = -(1/(4*u**2*E))
-    exp2 = -np.sqrt((1+Zeff)/(u**2*E))
-    a = -3*(1+Zeff)/16
-    E_max = np.max(E)
-
-    def sum_analytical(n, u, E_max, a):
-        """Calculate the analytical sum term evaluated at E_max"""
-        total = 0
-        for i in range(1, n+1):
-            # Using gamma function for factorial of negative numbers
-            term = (4*u**2)**(i+1) * E_max**(a+i+1) * np.exp(-(1/(4*u**2*E_max))) 
-            term = term * special.gamma(a+i+1) * (-1)**i / special.gamma(a+1)
-            total += term
-        return total
-
-
-    if analytical:
-        # Analytical expression evaluated at the upper limit E_max
-        dreiser_analytical = 4*u**2 * E_max**(a + 1) * np.exp(-(1/(4*u**2*E_max))) + sum_analytical(20, u, E_max, a)
-        
-        # For analytical, return a single value (the integral from E_0 to E_1)
-        return np.full_like(E, dreiser_analytical)
+    Compute integrated Dreicer seed in units of j0/ec.
     
-    if analytical and root:
-        pass
+    :param array_like Z: Atomic number, length should match the total number of charge states and species.
+    :param array_like Z0: Charge states, length should match the total number of charge states and species.
+    :param array_like n_j: Densities (in m^-3) for each species and charge state, last dimension should match the total number of charge states and species.
+    :param array_like T_e: Electron temperature [eV]
+    :param array_like j0: Initial Ohmic current density [A/m^2]
+    :param array_like R: Major radius of plasma [m]
+    :param array_like a: Minor radius of plasma [m]
+    :param array_like L: Self-inductance of plasma [H]
+    :param array_like I_p: Plasma current [A]
+    :param array_like B: Magnetic field used for syncrotron radiation when evaluating Eceff (default: 0)
+    :param int maxIter: Maximum number of iterations when evaluating p_star and Eceff (default: 20)
+    :param float reltol: Relative tolerence when evaluating p_star and Eceff (default: 1e-3)
+    :param int n_terms: Number of terms to include in the series expansion when evaluating the integral for the Dreicer seed (default: 20). Only used if analytical = True and gamma_func = False.
+    :param bool analytical: Bolean that determines whether to evaluate simplified model for the Compton seed. Fast, but overestimates the Compton seed (default: False)
+    :param bool gamma_func: Boolean that determines whether to evaluate the integral for the Dreicer seed using the upper incomplete gamma function(default: False). Only used if analytical = True.
+    """
+
+    e = plasma.e # Electron charge
+    c = plasma.c # Speed of light
+    We = plasma.We # Electron rest energy in eV
+    m = plasma.m_e # Electron mass
+    eps0 = plasma.eps0 # Vacuum permittivity
+    mu0 = plasma.mu0 # Vacuum permeability
+    
+    n_e_tot = np.sum(Z*n_j,axis = -1) # Total electron density
+    n_e_free = np.sum(Z0*n_j,axis = -1) # Free electron density
+    # Effective critical electric field in units of Ec
+    Eceff = plasma.calc_Eceff(Z,Z0,n_j,T_e, B = B, reltol = reltol, maxIter = maxIter)*n_e_tot/n_e_free    
+    # Ensure that E_init is not smaller than Eceff
+    E_init = np.maximum(Eceff,E_init)
+    E = np.linspace(Eceff,E_init,1000)
+    Z_eff = np.sum(Z0**2*n_j,axis = -1)/n_e_free # Effective charge
+    sigma = plasma.calc_spitzerCond(T_e,n_e_free,Z_eff)
+    Ec = plasma.calc_Ec(T_e,n_e_free)
+    E_init = j0/(sigma*Ec) # Initial electric field in units of Ec
+    lnL = plasma.lnLc(T_e,n_e_free,Z_eff) # Relativistic Coulomb logarithm
+    tauc = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L)
+    
+    n_hat = j0/(e*c)
+    ED = (n_e_free*e**3*lnL)/(4*np.pi*eps0**2*T_e)    
+    I_A = (4*np.pi*m*c)/(mu0*e) # Alfven current
+    u = np.sqrt(Ec/ED)
+    xi = -3*(1+Z_eff)/16
+    s = sigma * m/ (n_hat * e**2 * tauc) # dimensionless electric field
+    L_inductance = L if L != 0 else mu0 * R 
+    alpha = (L_inductance*I_p)/(R*mu0*I_A*lnL)*2/(np.sqrt(5 + Z_eff))
+    
+    if analytical:
+        Z_eff = plasma.calc_Zeff(Z0,Z,n_j,includeBoundElectrons = False)
+        if gamma_func:
+            x = 1/(4*u**2*E)
+            x0 = x[0]
+            x1 = x[-1]
+            
+            beta = -xi
+            
+            gamma_upper_x1 = special.gammaincc(beta + 1, x1) * special.gamma(beta + 1)
+            gamma_upper_x0 = special.gammaincc(beta + 1, x0) * special.gamma(beta + 1)
+            
+            # Apply recurrence relation to get gamma function for beta
+            term_x1 = (gamma_upper_x1 - x1**beta*np.exp(-x1))/beta
+            term_x0 = (gamma_upper_x0 - x0**beta*np.exp(-x0))/beta
+            
+            gamma_diff = term_x1 - term_x0
+            
+            intFoverE = (4*u**2)**(-xi)*gamma_diff
+        else:
+            ind = np.arange(1 , n_terms + 1)
+            xi_plus_ind = xi + ind
+            
+            product_terms = np.cumprod(xi_plus_ind)
+            
+            base = -4*u**2*E_init
+            
+            i_power = np.arange(1, n_terms + 1).reshape(-1, 1)
+            base_powers = base ** i_power
+            
+            terms = base_powers * product_terms.reshape(-1, 1)  
+            
+            series_sum = 1 + np.sum(terms, axis=0)
+            
+            intFoverE = 4*u**2*E_init*E_init**xi*np.exp(-1/(4*u**2*E_init) - np.sqrt((1+Z_eff)/(u**2*E_init)))*series_sum
+        
     else:
-        integrand = (E**a * np.exp(exp1 + exp2)) / E
-        dreiser_numerical = integrate.simpson(integrand, E)
-        return np.full_like(E, dreiser_numerical)
+        dndt = E**xi*np.exp(-1/(4*u**2*E) - np.sqrt((1+Z_eff)/(u**2*E)))
+        intFoverE = sp.integrate.simpson(dndt/E,E,axis = 0)
+        
+        
+    out = s * alpha * np.sqrt(Z_eff + 5)/(2**(3/2))*lnL *  n_e_free/n_hat * intFoverE
+    return out
+        
+        
 
 
 

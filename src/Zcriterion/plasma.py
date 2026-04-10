@@ -435,3 +435,4 @@ def calc_Eceff(Z,Z0,n_j,T_e,B,neglectBremsstrahlung = False,reltol = 1e-3,maxIte
     warnings.warn('Maximum number of iterations exceeded, Eceff not converged. Returning value from last iteration')
     return Eceff1/Ectot
 
+

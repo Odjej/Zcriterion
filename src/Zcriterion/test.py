@@ -90,7 +90,7 @@ def dreicer_analytical(E_points, E_min, Zeff, Te, n_terms, gamma_func = False):
                 term *= (-1)**n
                 series += term
 
-            result[j] = prefactor * (first + series)
+            result[j] = prefactor * (first + series) 
     
     else:
     # =========================
