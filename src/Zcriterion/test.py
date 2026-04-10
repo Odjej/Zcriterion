@@ -4,11 +4,10 @@ import matplotlib as mpl
 import Zcriterion.plasma as plasma
 from scipy import special
 import scipy.integrate as integrate
-mpl.use("pgf", force=True)
 import matplotlib.pyplot as plt
 import math
 
-mpl.rcParams.update({
+plt.rcParams.update({
     "text.usetex": True,
     "font.family": "serif",
     "text.latex.preamble": r"""
@@ -22,7 +21,7 @@ mpl.rcParams.update({
 })
 
 
-mpl.rcParams.update({
+plt.rcParams.update({
     "font.size": 12,
     "axes.labelsize": 12,
     "axes.titlesize": 12,
