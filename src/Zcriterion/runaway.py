@@ -418,7 +418,7 @@ def Gn(n,wc,Zeff):
     return out
 
 
-def calc_dreicerSeed(Z,Z0,Zeff,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3, n_terms = 20, analytical = False, gamma_func = False):
+def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3, analytical = False, gamma_func = False):
     """
     Compute integrated Dreicer seed in units of j0/ec.
     
@@ -434,8 +434,7 @@ def calc_dreicerSeed(Z,Z0,Zeff,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3
     :param array_like B: Magnetic field used for syncrotron radiation when evaluating Eceff (default: 0)
     :param int maxIter: Maximum number of iterations when evaluating p_star and Eceff (default: 20)
     :param float reltol: Relative tolerence when evaluating p_star and Eceff (default: 1e-3)
-    :param int n_terms: Number of terms to include in the series expansion when evaluating the integral for the Dreicer seed (default: 20). Only used if analytical = True and gamma_func = False.
-    :param bool analytical: Bolean that determines whether to evaluate simplified model for the Compton seed. Fast, but overestimates the Compton seed (default: False)
+    :param bool analytical: Bolean that determines whether to evaluate simplified model for the Compton seed using Helander's criteria. 
     :param bool gamma_func: Boolean that determines whether to evaluate the integral for the Dreicer seed using the upper incomplete gamma function(default: False). Only used if analytical = True.
     """
 
@@ -446,6 +445,7 @@ def calc_dreicerSeed(Z,Z0,Zeff,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3
     eps0 = plasma.eps0 # Vacuum permittivity
     mu0 = plasma.mu0 # Vacuum permeability
     
+    Z_eff = plasma.calc_Zeff(Z0,Z,n_j,includeBoundElectrons = False)
     n_e_tot = np.sum(Z*n_j,axis = -1) # Total electron density
     n_e_free = np.sum(Z0*n_j,axis = -1) # Free electron density
     # Effective critical electric field in units of Ec
@@ -460,17 +460,23 @@ def calc_dreicerSeed(Z,Z0,Zeff,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3
     lnL = plasma.lnLc(T_e,n_e_free,Z_eff) # Relativistic Coulomb logarithm
     tauc = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L)
     
+     
     n_hat = j0/(e*c)
     ED = (n_e_free*e**3*lnL)/(4*np.pi*eps0**2*T_e)    
     I_A = (4*np.pi*m*c)/(mu0*e) # Alfven current
     u = np.sqrt(Ec/ED)
+    A = np.pi*a**2 # Effecttive area of plasma
     xi = -3*(1+Z_eff)/16
     s = sigma * m/ (n_hat * e**2 * tauc) # dimensionless electric field
-    L_inductance = L if L != 0 else mu0 * R 
+    L_inductance = L if L != 0 else plasma.calc_selfInductance(R,a)
     alpha = (L_inductance*I_p)/(R*mu0*I_A*lnL)*2/(np.sqrt(5 + Z_eff))
     
+    def C(Z_eff):
+        return np.sqrt(Z_eff + 5)/(2**(3/2))*lnL *  n_e_free/n_hat * u **(-(27+3*Z_eff)/8)
+    
+    
     if analytical:
-        Z_eff = plasma.calc_Zeff(Z0,Z,n_j,includeBoundElectrons = False)
+       
         if gamma_func:
             x = 1/(4*u**2*E)
             x0 = x[0]
@@ -489,28 +495,18 @@ def calc_dreicerSeed(Z,Z0,Zeff,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3
             
             intFoverE = (4*u**2)**(-xi)*gamma_diff
         else:
-            ind = np.arange(1 , n_terms + 1)
-            xi_plus_ind = xi + ind
-            
-            product_terms = np.cumprod(xi_plus_ind)
-            
-            base = -4*u**2*E_init
-            
-            i_power = np.arange(1, n_terms + 1).reshape(-1, 1)
-            base_powers = base ** i_power
-            
-            terms = base_powers * product_terms.reshape(-1, 1)  
-            
-            series_sum = 1 + np.sum(terms, axis=0)
-            
-            intFoverE = 4*u**2*E_init*E_init**xi*np.exp(-1/(4*u**2*E_init) - np.sqrt((1+Z_eff)/(u**2*E_init)))*series_sum
-        
+            # Uses Helander's formula for the Dreicer seed with its definition of alpha
+            alpha = (np.sqrt(2*np.pi)/3)*(L_inductance)/(mu0*R)*(j0 * A)/(I_A*lnL)
+            F_E1 = (3 * lnL)/(2*np.pi**(1/2)*u**(15/4)) * (n_e_free)/(n_hat * E_init**(3/8))*np.exp(-(1)/(4*u**2*E_init) - np.sqrt(2/(u**2*E_init)))
+            intFoverE = F_E1 * E_init * 4 * u**2
+            return s * alpha * intFoverE
+
     else:
         dndt = E**xi*np.exp(-1/(4*u**2*E) - np.sqrt((1+Z_eff)/(u**2*E)))
         intFoverE = sp.integrate.simpson(dndt/E,E,axis = 0)
         
         
-    out = s * alpha * np.sqrt(Z_eff + 5)/(2**(3/2))*lnL *  n_e_free/n_hat * intFoverE
+    out = s * alpha * C(Z_eff) *  intFoverE
     return out
         
         
