@@ -418,7 +418,7 @@ def Gn(n,wc,Zeff):
     return out
 
 
-def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3, analytical = False, gamma_func = False):
+def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytical = False, gamma_func = False):
     """
     Compute integrated Dreicer seed in units of j0/ec.
     
@@ -429,8 +429,6 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3, ana
     :param array_like j0: Initial Ohmic current density [A/m^2]
     :param array_like R: Major radius of plasma [m]
     :param array_like a: Minor radius of plasma [m]
-    :param array_like L: Self-inductance of plasma [H]
-    :param array_like I_p: Plasma current [A]
     :param array_like B: Magnetic field used for syncrotron radiation when evaluating Eceff (default: 0)
     :param int maxIter: Maximum number of iterations when evaluating p_star and Eceff (default: 20)
     :param float reltol: Relative tolerence when evaluating p_star and Eceff (default: 1e-3)
@@ -456,23 +454,24 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3, ana
     Z_eff = np.sum(Z0**2*n_j,axis = -1)/n_e_free # Effective charge
     sigma = plasma.calc_spitzerCond(T_e,n_e_free,Z_eff)
     Ec = plasma.calc_Ec(T_e,n_e_free)
+    L_inductance = plasma.calc_selfInductance(R,a)
+    L_inductance_phys = mu0 * R * L_inductance # FRÅGA SKA DENNA SKALAS OM?
     E_init = j0/(sigma*Ec) # Initial electric field in units of Ec
     lnL = plasma.lnLc(T_e,n_e_free,Z_eff) # Relativistic Coulomb logarithm
-    tauc = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L)
+    tauCQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L_inductance_phys)
+    lnLee = plasma.lnLee(T_e,n_e_free)
     
-     
+    v_th = np.sqrt(2*e*T_e/m) # Electron thermal velocity 
     n_hat = j0/(e*c)
     ED = (n_e_free*e**3*lnL)/(4*np.pi*eps0**2*T_e)    
     I_A = (4*np.pi*m*c)/(mu0*e) # Alfven current
     u = np.sqrt(Ec/ED)
     A = np.pi*a**2 # Effecttive area of plasma
     xi = -3*(1+Z_eff)/16
+    tauc = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnL) # Relativistic collision time
     s = sigma * m/ (n_hat * e**2 * tauc) # dimensionless electric field
-    L_inductance = L if L != 0 else plasma.calc_selfInductance(R,a)
-    alpha = (L_inductance*I_p)/(R*mu0*I_A*lnL)*2/(np.sqrt(5 + Z_eff))
+    tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLee)
     
-    def C(Z_eff):
-        return np.sqrt(Z_eff + 5)/(2**(3/2))*lnL *  n_e_free/n_hat * u **(-(27+3*Z_eff)/8)
     
     
     if analytical:
@@ -506,7 +505,7 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,L,I_p,B=0, maxIter=20, reltol=1e-3, ana
         intFoverE = sp.integrate.simpson(dndt/E,E,axis = 0)
         
         
-    out = s * alpha * C(Z_eff) *  intFoverE
+    out = n_e_free * (e*c)/j0 * tauCQ/tau_ee * u**(2*xi) * intFoverE
     return out
         
         
