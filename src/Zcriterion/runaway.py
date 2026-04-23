@@ -438,7 +438,6 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
 
     e = plasma.e # Electron charge
     c = plasma.c # Speed of light
-    We = plasma.We # Electron rest energy in eV
     m = plasma.m_e # Electron mass
     eps0 = plasma.eps0 # Vacuum permittivity
     mu0 = plasma.mu0 # Vacuum permeability
@@ -462,15 +461,18 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
     lnLee = plasma.lnLee(T_e,n_e_free)
     
     v_th = np.sqrt(2*e*T_e/m) # Electron thermal velocity 
-    n_hat = j0/(e*c)
-    ED = (n_e_free*e**3*lnL)/(4*np.pi*eps0**2*T_e)    
-    I_A = (4*np.pi*m*c)/(mu0*e) # Alfven current
-    u = np.sqrt(Ec/ED)
-    A = np.pi*a**2 # Effecttive area of plasma
+    tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLee)
     xi = -3*(1+Z_eff)/16
+    ED = (n_e_free*e**3*lnL)/(4*np.pi*eps0**2*T_e) 
+    u = np.sqrt(Ec/ED)
+    
+    # Helander specifika uttryck.
+    n_hat = j0/(e*c)
+    I_A = (4*np.pi*m*c)/(mu0*e) # Alfven current
+    A = np.pi*a**2 # Effecttive area of plasma
     tauc = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnL) # Relativistic collision time
     s = sigma * m/ (n_hat * e**2 * tauc) # dimensionless electric field
-    tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLee)
+   
     
     
     
