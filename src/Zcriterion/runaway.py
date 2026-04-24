@@ -418,7 +418,7 @@ def Gn(n,wc,Zeff):
     return out
 
 
-def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,a_wall,B=0, maxIter=20, reltol=1e-3, analytical = False, gamma_func = False):
+def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytical = False, gamma_func = False):
     """
     Compute integrated Dreicer seed in units of j0/ec.
     
