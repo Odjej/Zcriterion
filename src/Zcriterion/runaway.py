@@ -418,7 +418,7 @@ def Gn(n,wc,Zeff):
     return out
 
 
-def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytical = False, gamma_func = False):
+def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,a_wall,B=0, maxIter=20, reltol=1e-3, analytical = False, gamma_func = False):
     """
     Compute integrated Dreicer seed in units of j0/ec.
     
@@ -429,6 +429,7 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
     :param array_like j0: Initial Ohmic current density [A/m^2]
     :param array_like R: Major radius of plasma [m]
     :param array_like a: Minor radius of plasma [m]
+    :param float a_wall: Minor radius of reactor wall [m]
     :param array_like B: Magnetic field used for syncrotron radiation when evaluating Eceff (default: 0)
     :param int maxIter: Maximum number of iterations when evaluating p_star and Eceff (default: 20)
     :param float reltol: Relative tolerence when evaluating p_star and Eceff (default: 1e-3)
@@ -441,7 +442,8 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
     m = plasma.m_e # Electron mass
     eps0 = plasma.eps0 # Vacuum permittivity
     mu0 = plasma.mu0 # Vacuum permeability
-    
+    x1 = plasma.x1 # First zero of the Bessel function j0
+
     Z_eff = plasma.calc_Zeff(Z0,Z,n_j,includeBoundElectrons = False)
     n_e_tot = np.sum(Z*n_j,axis = -1) # Total electron density
     n_e_free = np.sum(Z0*n_j,axis = -1) # Free electron density
@@ -456,25 +458,13 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
     L_inductance = plasma.calc_selfInductance(R,a) # Self-inductance in units of mu0*R
     L_inductance_phys = mu0 * R * L_inductance # Physical self-inductance in H
     E_init = j0/(sigma*Ec) # Initial electric field in units of Ec
-    lnL = plasma.lnLc(T_e,n_e_free,Z_eff) # Relativistic Coulomb logarithm
     tauCQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L_inductance_phys) # Current quench time
     lnLth = plasma.lnLth(T_e,n_e_free) # Thermal Coulomb logarithm
     
     v_th = np.sqrt(2*e*T_e/m) # Electron thermal velocity 
     tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLth)
     xi = -3*(1+Z_eff)/16
-    ED = (n_e_free*e**3*lnL)/(4*np.pi*eps0**2*T_e) 
-    u = np.sqrt(Ec/ED)
-    
-    # Helander specifika uttryck.
-    n_hat = j0/(e*c)
-    I_A = (4*np.pi*m*c)/(mu0*e) # Alfven current
-    A = np.pi*a**2 # Effecttive area of plasma
-    tauc = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnL) # Relativistic collision time
-    s = sigma * m/ (n_hat * e**2 * tauc) # dimensionless electric field
-   
-    
-    
+    u = np.sqrt(T_e * e/(m*c**2)) # Normalized electron thermal velocity
     
     if analytical:
        
@@ -496,19 +486,17 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
             
             intFoverE = (4*u**2)**(-xi)*gamma_diff
         else:
-            # Uses Helander's formula for the Dreicer seed with its definition of alpha
-            alpha = (np.sqrt(2*np.pi)/3)*(L_inductance)/(mu0*R)*(j0 * A)/(I_A*lnL)
-            F_E1 = (3 * lnL)/(2*np.pi**(1/2)*u**(15/4)) * (n_e_free)/(n_hat * E_init**(3/8))*np.exp(-(1)/(4*u**2*E_init) - np.sqrt(2/(u**2*E_init)))
-            intFoverE = F_E1 * E_init * 4 * u**2
-            return s * alpha * intFoverE
-
+            series = (1 + (-4*u**2*E_init)*((-3*(1+1)/16) + 1))
+            nseed = 4*u**2 * E_init * x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee * u **(-3(1+1)/8) * E_init**(-3*(1+1)/16) * np.exp(-1/(4*u**2*E_init) - np.sqrt((1+1)/u**1*E_init)) * series
+            return nseed
+        
     else:
         dndt = E**xi*np.exp(-1/(4*u**2*E) - np.sqrt((1+Z_eff)/(u**2*E)))
         intFoverE = sp.integrate.simpson(dndt/E,E,axis = 0)
         
         
-    out = n_e_free * (e*c)/j0 * tauCQ/tau_ee * u**(2*xi) * intFoverE
-    return out
+    nseed = x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee * u**(2*xi) * intFoverE
+    return nseed
         
         
 
