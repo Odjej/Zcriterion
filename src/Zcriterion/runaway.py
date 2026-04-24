@@ -448,24 +448,23 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
     n_e_tot = np.sum(Z*n_j,axis = -1) # Total electron density
     n_e_free = np.sum(Z0*n_j,axis = -1) # Free electron density
     # Effective critical electric field in units of Ec
-    Eceff = plasma.calc_Eceff(Z,Z0,n_j,T_e, B = B, reltol = reltol, maxIter = maxIter)*n_e_tot/n_e_free    
-    # Ensure that E_init is not smaller than Eceff
-    E_init = np.maximum(Eceff,E_init) 
-    E = np.linspace(Eceff,E_init,1000)
-    Z_eff = np.sum(Z0**2*n_j,axis = -1)/n_e_free # Effective charge
-    sigma = plasma.calc_spitzerCond(T_e,n_e_free,Z_eff)
+    Eceff = plasma.calc_Eceff(Z,Z0,n_j,T_e, B = B, reltol = reltol, maxIter = maxIter)*n_e_tot/n_e_free 
     Ec = plasma.calc_Ec(T_e,n_e_free) # Critical electric field
     L_inductance = plasma.calc_selfInductance(R,a) # Self-inductance in units of mu0*R
     L_inductance_phys = mu0 * R * L_inductance # Physical self-inductance in H
-    E_init = j0/(sigma*Ec) # Initial electric field in units of Ec
+    sigma = plasma.calc_spitzerCond(T_e,n_e_free,Z_eff)
+    E_init = j0/(sigma*Ec) # Initial electric field in units of Ec   
+    # Ensure that E_init is not smaller than Eceff
+    E_init = np.maximum(Eceff,E_init) 
+    E = np.linspace(Eceff,E_init,1000)
     tauCQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L_inductance_phys) # Current quench time
     lnLth = plasma.lnLth(T_e,n_e_free) # Thermal Coulomb logarithm
     
     v_th = np.sqrt(2*e*T_e/m) # Electron thermal velocity 
-    tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLth)
-    xi = -3*(1+Z_eff)/16
+    tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLth) # Electron-electron collision time
     u = np.sqrt(T_e * e/(m*c**2)) # Normalized electron thermal velocity
-    
+    xi = -3*(1+Z_eff)/16
+     
     if analytical:
        
         if gamma_func:
@@ -487,7 +486,7 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
         else:
             # Uses series approximation of the integral, evaluated with one term and Helander's approximation of Z_eff = 1.
             series = (1 + (-4*u**2*E_init)*((-3*(1+1)/16) + 1))
-            nseed = 4*u**2 * E_init * x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee * u **(-3(1+1)/8) * E_init**(-3*(1+1)/16) * np.exp(-1/(4*u**2*E_init) - np.sqrt((1+1)/u**1*E_init)) * series
+            nseed = 4*u**2 * E_init * x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee * u**(-3*(1+1)/8) * E_init**(-3*(1+1)/16) * np.exp(-1/(4*u**2*E_init) - np.sqrt((1+1)/(u**1*E_init))) * series
             return nseed
         
     else:
