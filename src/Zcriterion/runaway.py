@@ -448,20 +448,20 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
     # Effective critical electric field in units of Ec
     Eceff = plasma.calc_Eceff(Z,Z0,n_j,T_e, B = B, reltol = reltol, maxIter = maxIter)*n_e_tot/n_e_free    
     # Ensure that E_init is not smaller than Eceff
-    E_init = np.maximum(Eceff,E_init)
+    E_init = np.maximum(Eceff,E_init) 
     E = np.linspace(Eceff,E_init,1000)
     Z_eff = np.sum(Z0**2*n_j,axis = -1)/n_e_free # Effective charge
     sigma = plasma.calc_spitzerCond(T_e,n_e_free,Z_eff)
-    Ec = plasma.calc_Ec(T_e,n_e_free)
-    L_inductance = plasma.calc_selfInductance(R,a)
-    L_inductance_phys = mu0 * R * L_inductance # FRÅGA SKA DENNA SKALAS OM?
+    Ec = plasma.calc_Ec(T_e,n_e_free) # Critical electric field
+    L_inductance = plasma.calc_selfInductance(R,a) # Self-inductance in units of mu0*R
+    L_inductance_phys = mu0 * R * L_inductance # Physical self-inductance in H
     E_init = j0/(sigma*Ec) # Initial electric field in units of Ec
     lnL = plasma.lnLc(T_e,n_e_free,Z_eff) # Relativistic Coulomb logarithm
-    tauCQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L_inductance_phys)
-    lnLee = plasma.lnLee(T_e,n_e_free)
+    tauCQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L_inductance_phys) # Current quench time
+    lnLth = plasma.lnLth(T_e,n_e_free) # Thermal Coulomb logarithm
     
     v_th = np.sqrt(2*e*T_e/m) # Electron thermal velocity 
-    tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLee)
+    tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLth)
     xi = -3*(1+Z_eff)/16
     ED = (n_e_free*e**3*lnL)/(4*np.pi*eps0**2*T_e) 
     u = np.sqrt(Ec/ED)
