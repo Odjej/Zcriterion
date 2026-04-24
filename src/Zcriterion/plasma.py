@@ -436,3 +436,29 @@ def calc_Eceff(Z,Z0,n_j,T_e,B,neglectBremsstrahlung = False,reltol = 1e-3,maxIte
     return Eceff1/Ectot
 
 
+def betaSpectrum(p):
+    # p is dimensionless (p / m_e c)
+
+    global We, alpha, m_e, c
+
+    gamma = np.sqrt(1 + p**2)
+
+    W_max = 18.6e3  # eV
+    W = We * (gamma - 1)     # kinetic energy in eV
+    W_tot = We * gamma       # total energy in eV
+
+    def fermiFunc(p, Z=2):
+        beta = p / gamma
+        eta = alpha * Z / beta
+        return (2*np.pi*eta) / (1 - np.exp(-2*np.pi*eta))
+
+    return np.where(
+        W <= W_max,
+        fermiFunc(p, 2) * p * W_tot * (W_max - W)**2,
+        0
+    )
+
+
+
+
+
