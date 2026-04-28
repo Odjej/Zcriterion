@@ -464,7 +464,7 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
     tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLth) # Electron-electron collision time
     u = np.sqrt(T_e * e/(m*c**2)) # Normalized electron thermal velocity
     xi = -3*(1+Z_eff)/16
-     
+
     if analytical:
        
         if gamma_func:
@@ -482,7 +482,7 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
             term_x0 = (gamma_upper_x0 - x0**beta*np.exp(-x0))/beta
             
             gamma_diff = term_x1 - term_x0
-            intFoverE = (4*u**2)**(-xi)*gamma_diff
+            intFoverE = (4*u**2)**(-xi)*gamma_diff*np.exp(-np.sqrt((1+Z_eff)/(u**2*E_init)))
         else:
             # Uses series approximation of the integral, evaluated with one term and Helander's approximation of Z_eff = 1.
             series = (1 + (-4*u**2*E_init)*((-3*(1+1)/16) + 1))
