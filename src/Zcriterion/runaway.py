@@ -484,9 +484,9 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
             gamma_diff = term_x1 - term_x0
             intFoverE = (4*u**2)**(-xi)*gamma_diff*np.exp(-np.sqrt((1+Z_eff)/(u**2*E_init)))
         else:
-            # Uses series approximation of the integral, evaluated with one term and Helander's approximation of Z_eff = 1.
-            series = (1 + (-4*u**2*E_init)*((-3*(1+1)/16) + 1))
-            nseed = 4*u**2 * E_init * x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee * u**(-3*(1+1)/8) * E_init**(-3*(1+1)/16) * np.exp(-1/(4*u**2*E_init) - np.sqrt((1+1)/(u**1*E_init))) * series
+            # Uses series approximation of the integral, evaluated with one term and Helander's approximation.
+            series = (1 + (-4*u**2*E_init)*(xi + 1))
+            nseed = 4*u**2 * E_init * x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee * u**(2*xi) * E_init**(xi) * np.exp(-1/(4*u**2*E_init) - np.sqrt((1+Z_eff)/(u**2*E_init))) * series
             return nseed
         
     else:
