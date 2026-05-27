@@ -1,11 +1,9 @@
 import numpy as np
 import scipy as sp
 import Zcriterion.plasma as plasma
-import math as math
 from scipy import special
 import scipy.integrate as integrate
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
+
 
 tau_T = 4500*24*60*60 # Tritium half-life [s]
 W_max = 18.6e3 # Maximum beta energy [eV]
