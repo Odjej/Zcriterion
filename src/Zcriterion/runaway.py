@@ -1,6 +1,11 @@
 import numpy as np
 import scipy as sp
 import Zcriterion.plasma as plasma
+import math as math
+from scipy import special
+import scipy.integrate as integrate
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 
 tau_T = 4500*24*60*60 # Tritium half-life [s]
 W_max = 18.6e3 # Maximum beta energy [eV]
@@ -379,6 +384,7 @@ def calc_analyticalTritiumSeedIntegral(E,Zeff):
 
     :param array_like E: Normalized electric field in units of Ec.
     :param array_like Zeff: Effective charge.
+
     """
     global W_max
     We = plasma.We # Electron rest energy in eV
@@ -410,3 +416,87 @@ def Gn(n,wc,Zeff):
              - a**((2*n+1)/4)*sp.special.chebyt(2*n + 1)(u)*np.arctan(2*np.sqrt(wc)*a**(1/4)*u/(np.sqrt(a) - wc))
              - a**((2*n+1)/4)*v*sp.special.chebyu(2*n)(u)*np.arctanh(2*np.sqrt(wc)*a**(1/4)*v/(np.sqrt(a) + wc)))
     return out
+
+
+def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytical = False, gamma_func = False):
+    """
+    Compute integrated Dreicer seed in units of j0/ec.
+    
+    :param array_like Z: Atomic number, length should match the total number of charge states and species.
+    :param array_like Z0: Charge states, length should match the total number of charge states and species.
+    :param array_like n_j: Densities (in m^-3) for each species and charge state, last dimension should match the total number of charge states and species.
+    :param array_like T_e: Electron temperature [eV]
+    :param array_like j0: Initial Ohmic current density [A/m^2]
+    :param array_like R: Major radius of plasma [m]
+    :param array_like a: Minor radius of plasma [m]
+    :param float a_wall: Minor radius of reactor wall [m]
+    :param array_like B: Magnetic field used for syncrotron radiation when evaluating Eceff (default: 0)
+    :param int maxIter: Maximum number of iterations when evaluating p_star and Eceff (default: 20)
+    :param float reltol: Relative tolerence when evaluating p_star and Eceff (default: 1e-3)
+    :param bool analytical: Bolean that determines whether to evaluate simplified model for the Compton seed using Helander's criteria. 
+    :param bool gamma_func: Boolean that determines whether to evaluate the integral for the Dreicer seed using the upper incomplete gamma function(default: False).
+    """
+
+    e = plasma.e # Electron charge
+    c = plasma.c # Speed of light
+    m = plasma.m_e # Electron mass
+    eps0 = plasma.eps0 # Vacuum permittivity
+    mu0 = plasma.mu0 # Vacuum permeability
+    x1 = plasma.x1 # First zero of the Bessel function j0
+
+    Z_eff = plasma.calc_Zeff(Z0,Z,n_j,includeBoundElectrons = False)
+    n_e_tot = np.sum(Z*n_j,axis = -1) # Total electron density
+    n_e_free = np.sum(Z0*n_j,axis = -1) # Free electron density
+    # Effective critical electric field in units of Ec
+    Eceff = plasma.calc_Eceff(Z,Z0,n_j,T_e, B = B, reltol = reltol, maxIter = maxIter)*n_e_tot/n_e_free 
+    Ec = plasma.calc_Ec(T_e,n_e_free) # Critical electric field
+    L_inductance = plasma.calc_selfInductance(R,a) # Self-inductance in units of mu0*R
+    L_inductance_phys = mu0 * R * L_inductance # Physical self-inductance in H
+    sigma = plasma.calc_spitzerCond(T_e,n_e_free,Z_eff)
+    E_init = j0/(sigma*Ec) # Initial electric field in units of Ec   
+    E = np.linspace(Eceff,E_init,1000)
+    tauCQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L_inductance_phys) # Current quench time
+    lnLth = plasma.lnLth(T_e,n_e_free) # Thermal Coulomb logarithm
+    
+    v_th = np.sqrt(2*e*T_e/m) # Electron thermal velocity 
+    tau_ee = (4*np.pi*eps0**2*m**2*v_th**3)/(n_e_free*e**4*lnLth) # Electron-electron collision time
+    u = np.sqrt(T_e * e/(m*c**2)) # Normalized electron thermal velocity
+    xi = -3*(1+Z_eff)/16
+
+    if analytical:
+       
+        if gamma_func:
+            x = 1/(4*u**2*E)
+            x0 = x[0]
+            x1 = x[-1]
+            
+            beta = -xi
+            
+            gamma_upper_x1 = special.gammaincc(beta + 1, x1) * special.gamma(beta + 1)
+            gamma_upper_x0 = special.gammaincc(beta + 1, x0) * special.gamma(beta + 1)
+            
+            # Apply recurrence relation to get gamma function for beta
+            term_x1 = (gamma_upper_x1 - x1**beta*np.exp(-x1))/beta
+            term_x0 = (gamma_upper_x0 - x0**beta*np.exp(-x0))/beta
+            
+            gamma_diff = term_x1 - term_x0
+            intFoverE = (4*u**2)**(-xi)*gamma_diff*np.exp(-np.sqrt((1+Z_eff)/(u**2*E_init)))
+        else:
+            # Uses series approximation of the integral, evaluated with one term and Helander's approximation.
+            series = (1 + (-4*u**2*E_init)*(xi + 1))
+            nseed = (4*u**2 * E_init * x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee 
+                     * u**(2*xi) * E_init**(xi) * np.exp(-1/(4*u**2*E_init) - np.sqrt((1+Z_eff)/(u**2*E_init))) * series)
+            return nseed
+        
+    else:
+        dndt = E**xi*np.exp(-1/(4*u**2*E) - np.sqrt((1+Z_eff)/(u**2*E)))
+        intFoverE = sp.integrate.simpson(dndt/E,E,axis = 0)
+        
+        
+    nseed = x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee * u**(2*xi) * intFoverE
+    return nseed
+        
+        
+
+
+
