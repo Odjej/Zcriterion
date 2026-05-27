@@ -434,7 +434,7 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
     :param int maxIter: Maximum number of iterations when evaluating p_star and Eceff (default: 20)
     :param float reltol: Relative tolerence when evaluating p_star and Eceff (default: 1e-3)
     :param bool analytical: Bolean that determines whether to evaluate simplified model for the Compton seed using Helander's criteria. 
-    :param bool gamma_func: Boolean that determines whether to evaluate the integral for the Dreicer seed using the upper incomplete gamma function(default: False). Only used if analytical = True.
+    :param bool gamma_func: Boolean that determines whether to evaluate the integral for the Dreicer seed using the upper incomplete gamma function(default: False).
     """
 
     e = plasma.e # Electron charge
@@ -454,8 +454,6 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
     L_inductance_phys = mu0 * R * L_inductance # Physical self-inductance in H
     sigma = plasma.calc_spitzerCond(T_e,n_e_free,Z_eff)
     E_init = j0/(sigma*Ec) # Initial electric field in units of Ec   
-    # Ensure that E_init is not smaller than Eceff
-    E_init = np.maximum(Eceff,E_init) 
     E = np.linspace(Eceff,E_init,1000)
     tauCQ = plasma.calc_tau_CQ(T_e,n_e_free,Z_eff,R,a,L_inductance_phys) # Current quench time
     lnLth = plasma.lnLth(T_e,n_e_free) # Thermal Coulomb logarithm
@@ -486,7 +484,8 @@ def calc_dreicerSeed(Z,Z0,n_j,T_e,j0,R,a,B=0, maxIter=20, reltol=1e-3, analytica
         else:
             # Uses series approximation of the integral, evaluated with one term and Helander's approximation.
             series = (1 + (-4*u**2*E_init)*(xi + 1))
-            nseed = 4*u**2 * E_init * x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee * u**(2*xi) * E_init**(xi) * np.exp(-1/(4*u**2*E_init) - np.sqrt((1+Z_eff)/(u**2*E_init))) * series
+            nseed = (4*u**2 * E_init * x1**2/2 * n_e_free * (e*c)/j0 * tauCQ/tau_ee 
+                     * u**(2*xi) * E_init**(xi) * np.exp(-1/(4*u**2*E_init) - np.sqrt((1+Z_eff)/(u**2*E_init))) * series)
             return nseed
         
     else:
